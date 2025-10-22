@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Image Generator for Zakeke</title>
+    <style>
+        /* Simple styling to make it look decent */
+        body { font-family: sans-serif; padding: 20px; }
+        textarea { width: 90%; max-width: 400px; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; }
+        #generate-button { padding: 10px 15px; background-color: #007bff; color: white; border: none; cursor: pointer; }
+        #generate-button:hover { background-color: #0056b3; }
+        #status-message { margin-top: 10px; font-weight: bold; }
+        #image-container { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 20px; }
+        #image-container img { 
+            width: 150px; 
+            height: 150px; 
+            object-fit: cover; /* Ensures image fills the container without distortion */
+            cursor: pointer; 
+            border: 3px solid transparent; 
+            border-radius: 8px; /* Slightly rounded corners */
+            transition: border-color 0.2s;
+        }
+        #image-container img:hover { border-color: #ff9900; }
+    </style>
+</head>
+<body>
+
+    <h2>AI Design for Your Porcelain</h2>
+    <p>Enter a creative prompt (e.g., "A hyper-realistic watercolor painting of a sunflower") and click 'Generate'.</p>
+
+    <textarea id="prompt-input" rows="4" placeholder="Enter your design prompt here..."></textarea>
+    <br>
+    <button id="generate-button">Generate Images</button>
+    <p id="status-message">Ready to generate.</p>
+
+    <div id="image-container">
+        </div>
+
+    <script>
+        // --- YOUR JAVASCRIPT LOGIC GOES HERE ---
+        
+        // 1. PLACEHOLDER FOR IDEOGRAM API DETAILS (YOU MUST FILL THESE IN)
+        const API_KEY = 'NHQVyW22hl3X12hmbmzZCRMMrRRl-XoSvXAqXzxPsGh3_WxH0ul5l-n93EivrbFhPtDf53LtN7Po27wUa8CX0w'; // <-- PASTE YOUR KEY HERE
+        const GENERATE_URL = 'https://api.ideogram.ai/v1/ideogram-v3/generate'; // <-- e.g., 'https://api.ideogram.ai/v1/generate'
+
+        // 2. LOGIC TO HANDLE THE GENERATE BUTTON CLICK
+        document.getElementById('generate-button').addEventListener('click', async () => {
+            const prompt = document.getElementById('prompt-input').value;
+            const status = document.getElementById('status-message');
+            const imageContainer = document.getElementById('image-container');
+
+            if (!prompt) {
+                status.textContent = 'Please enter a prompt to generate an image.';
+                return;
+            }
+
+            status.textContent = 'Generating image... this may take 30-60 seconds.';
+            imageContainer.innerHTML = ''; // Clear previous images
+            document.getElementById('generate-button').disabled = true; // Disable button while loading
+
+            try {
+                const response = await fetch(GENERATE_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}` // Common method for API keys
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+    rendering_speed: 'TURBO', // Use TURBO for fast results
+    aspect_ratio: '1:1', // Recommended square size for the plate
+    style: 'photorealistic',
+    count: 4 // Give the user four options to choose from
+                        // ---------------------------------------------------------
+                    })
+                });
+
+                const data = await response.json();
+
+                // -------------------------------------------------------------
+                // NOTE: THE FOLLOWING LINE IS A GUESS! 
+                // You MUST replace 'data.images' with the correct path to the array 
+                // of image URL objects in Ideogram's API response.
+                // -------------------------------------------------------------
+                const images = data.data;
+
+                if (images.length > 0) {
+                    status.textContent = 'Images generated! Click the one you want to place on your porcelain.';
+                    images.forEach(image => {
+                        const img = document.createElement('img');
+                        // Use the URL from the API response
+                        img.src = image.url; 
+                        img.alt = prompt;
+                        img.setAttribute('data-url', image.url); // Store the URL for the next step
+                        imageContainer.appendChild(img);
+                    });
+                } else {
+                    status.textContent = 'Image generation failed or returned no results. Check your prompt, API key, and console for errors.';
+                }
+
+            } catch (error) {
+                status.textContent = `An error occurred. Check the browser console (F12) for details.`;
+                console.error('API Error:', error);
+            } finally {
+                document.getElementById('generate-button').disabled = false; // Re-enable button
+            }
+        });
+
+
+        // 3. LOGIC TO COMMUNICATE WITH ZAKEKE (using the required postMessage)
+        document.getElementById('image-container').addEventListener('click', function(event) {
+            // Check if the clicked element is one of the generated images
+            if (event.target.tagName === 'IMG') {
+                const imageUrl = event.target.getAttribute('data-url');
+                
+                // Zakeke requires the MIME type. We'll make an educated guess.
+               const mimeType = 'image/png';
+
+                // *** THIS IS THE CRITICAL COMMUNICATION LINE WITH ZAKEKE ***
+                window.parent.postMessage({
+                    message_type: 'IMAGE_SELECTED',
+                    url: imageUrl,
+                    mime: mimeType,
+                    // Optional: You can specify physical dimensions in centimeters here 
+                    // to prevent the customer from resizing it on the product.
+                    // physical_width: 8, 
+                    // physical_height: 8 
+                }, '*'); // '*' means it sends the message to the parent iframe (Zakeke)
+
+                document.getElementById('status-message').textContent = 'Design sent to your 3D product!';
+            }
+        });
+        
+    </script>
+
+</body>
+</html>
